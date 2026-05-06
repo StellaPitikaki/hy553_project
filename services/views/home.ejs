@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+<%- include('frags/head'); %>
+
+<script>
+window.addEventListener( 'load', ()=>{
+        ATON.realize2D();
+        ATON.UI.setTheme("light");
+
+        // Hero
+        let elHero = document.getElementById("hero");
+        if (elHero.children.length <= 0){
+                //console.log(elHero)
+                ATON.UI.loadPartial("/common/hero.html","hero");
+        }
+
+        // Staff pick
+        let elStaffPick = document.getElementById("staffpick");
+        let elStaffPickBand = document.getElementById("staffpickband");
+
+        // Apps
+        let elApps = document.getElementById("apps");
+
+        // Pub scenes
+        let elPubScenes = document.getElementById("pubscenes");
+
+        // Content
+        ATON.REQ.get("scenes/", entries =>{
+
+                let spscenes = [];
+
+                for (let s in entries){
+                        const S = entries[s];
+
+                        if (S.staffpick) spscenes.push(S);
+                }
+
+                ATON.UI.createPublicScenesGallery({
+                        containerid: "pubscenes",
+                        //size:"small",
+                        entries: entries,
+                        <% if (samples) { %> samples: true <% } %>
+                });
+
+                // Staff pick
+                if (spscenes.length < 1){
+                        ATON.UI.hideElement(elStaffPick);
+                        return;
+                }
+                
+                spscenes.sort(() => Math.random() - 0.5);
+
+                for (let s in spscenes){
+                        let S = spscenes[s];
+
+                        elStaffPickBand.append(
+                                ATON.UI.createSceneCard({
+                                        title: S.title,
+                                        sid: S.sid,
+                                        keywords: S.kwords,
+                                        //classes: "aton-card-accent",
+                                        //size: "large",
+                                        useblurtint: true,
+                                        badge: ATON.UI.createIcon("bi-star-fill")
+                                })
+                        );
+                }
+
+        });
+
+        // Navbar
+        let elNavCont  = document.getElementById("navbarSupportedContent");
+        let elNavItems = document.getElementById("navbarItems");
+
+        let elSearch = ATON.UI.createLiveFilter({
+                filterclass: "aton-card",
+                oninput: (term)=>{
+                        if (term.length < 2){
+                                ATON.UI.showElement(elHero);
+                                ATON.UI.showElement(elApps);
+                                ATON.UI.showElement(elStaffPick);   
+                        }
+                        else {
+                                ATON.UI.hideElement(elHero);
+                                ATON.UI.hideElement(elApps);
+                                ATON.UI.hideElement(elStaffPick);
+                        }
+                }
+/*
+                onfocus: ()=>{
+                        ATON.UI.hideElement(elHero);
+                        ATON.UI.hideElement(elApps);
+                        ATON.UI.hideElement(elStaffPick);
+                },
+                onblur: ()=>{
+                        ATON.UI.showElement(elHero);
+                        ATON.UI.showElement(elApps);
+                        ATON.UI.showElement(elStaffPick);   
+                },
+*/
+                //list: []
+        })
+
+
+
+        elNavCont.append(elSearch);
+
+        let btnLogin = ATON.UI.createButton({
+                icon: "user",
+                //icon: "user",
+                text: "Login",
+                //variant: "accent",
+                onpress: ()=>{
+                        window.location.href = "/login/?u=/myscenes" //+"?u="+window.location.href;
+/*
+                        ATON.UI.showModal({
+                                //header: "Login",
+                                body: ATON.UI.createLoginForm({
+                                        onSuccess: (r)=>{
+                                                btnLogin.innerHTML = r.username;
+                                                ATON.UI.hideModal()
+                                        },
+                                        onFail: ()=>{}
+                                })
+                        })
+*/
+                }
+
+        });
+
+
+        elNavCont.append(btnLogin);
+
+        ATON.checkAuth(
+                (u)=>{
+                        console.log(u)
+
+                        btnLogin.remove();
+/*
+                        btnLogin.replaceWith(ATON.UI.createButton({
+                                icon: "bi-person",
+                                //icon: "user",
+                                text: u.username,
+                                onpress: ()=>{
+                                        //window.location.href = "/login"+"?u="+window.location.href;
+                                }
+                        }));
+*/
+
+/*
+                        elNavCont.prepend(
+                                ATON.UI.createButton({
+                                        text: "Collection",
+                                        icon: "collection-item",
+                                        onpress: ()=>{ window.location.href = "/mycollection"; }
+                                }),
+
+                                ATON.UI.createButton({
+                                        text: "Scenes",
+                                        icon: "scene",
+                                        onpress: ()=>{ window.location.href = "/myscenes"; }
+                                }),
+                        );
+*/
+                        elNavCont.append( SHU.createMainAuthDropdown(u) );
+                        SHU.createNavbarAuthSections();
+
+                }
+        );
+});
+</script>
+</head>
+
+<body class="shuBodyToolbar">
+        <!-- Navbar -->
+        <%- include('frags/navbar'); %>
+
+        <!-- <div style="margin-top: 40px;"></div>  -->
+
+        <!-- Hero section -->
+        <div id="hero">
+                <% if (!customhero){ %>
+                        <%- include('frags/hero'); %> 
+                <% } %>
+        </div>
+        
+
+        <!-- Staff Pick -->
+        <div id="staffpick" class="shuGalleryContainer" style="padding: 0px;">
+                <div class="shuSectionTitleContainer">
+                        <h2>
+                                <!--  <i class='bi bi-star' style='vertical-align:middle; margin-right: 8px;'></i> -->
+                                <img class="aton-icon" src="/res/icons/v2/star.png">
+                                Staff Pick</h2>
+                </div>
+                <div id="staffpickband" class="shuStaffPickContainer aton-hscrollable"></div>
+        </div>
+
+        <!-- Apps -->
+        <% if (apps.length>0) { %>
+        <div id="apps" class="shuGalleryContainer">
+                <div class="shuSectionTitleContainer">
+                        <h2>Apps</h2>
+                        WebApps accessible on this instance
+                </div>
+        </div>
+        <% } %>
+
+        <!-- Public scenes -->
+        <div id="pubscenes" class="shuGalleryContainer">
+                <div class="shuSectionTitleContainer">
+                        <h2>
+                                <!--  <i class='bi bi-people' style='vertical-align:middle; margin-right: 8px;'></i> -->
+                                <img class="aton-icon" src="/res/icons/v2/public.png">
+                                Public Scenes</h2>
+                        3D content published by users
+                </div>
+        </div>
+
+        <div id="footer" class="aton-footer">
+                <%- include('frags/footer'); %>
+        </div>
+</body>
