@@ -17,7 +17,7 @@ APP.setup = ()=>{
     ATON.UI.addBasicEvents();
 
 	// Load sample 3D model
-	ATON.createSceneNode("sample").load("samples/models/skyphos/skyphos.gltf").attachToRoot();
+	ATON.createSceneNode("sample").load("samples/models/skyphos/Ball_Return_with_motor.glb").attachToRoot();
 
     // If our app required ore or more flares (plugins), we can also wait for them to be ready for specific setups
     ATON.on("AllFlaresReady",()=>{
