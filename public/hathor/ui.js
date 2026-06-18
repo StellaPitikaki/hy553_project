@@ -1536,10 +1536,6 @@ UI.sideTools = ()=>{
         UI.createBlockGroup({ items: [toggleBtn] })
     );
 
-    elPhysicsSection.append(
-        UI.createTextBlock("Control the interactive timeline playback loops of 3D objects in the current physics workspace:"),
-        UI.createBlockGroup({ items: [toggleBtn] })
-    );
 
     // --- 3. Build Collapsible Side Tree Layout ---
     elBody.append(

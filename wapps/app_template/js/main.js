@@ -1,37 +1,25 @@
 /*
-	Main js entry for template ATON web-app
-
+    Main js entry for template ATON web-app
 ===============================================*/
 // Realize our app
 let APP = ATON.App.realize();
 
-// You can require here flares (plugins) if needed by the app
-//APP.requireFlares(["myFlare","anotherFlare"]);
-
 // APP.setup() is required for web-app initialization
-// You can place here UI setup (HTML), events handling, etc.
-APP.setup = ()=>{
+APP.setup = () => {
 
-	// Realize base ATON and add base UI events
+    // Realize base ATON and add base UI events
     ATON.realize();
     ATON.UI.addBasicEvents();
 
-// Load sample 3D model
-	ATON.createSceneNode("sample").load("samples/models/skyphos/basic_classroom.glb").attachToRoot();
-	// Load sample 3D model
-	ATON.createSceneNode("sample").load("samples/models/skyphos/Newton_craddle_onDesk.glb").attachToRoot();
+    // FIX: Assign unique identifiers to match your scene graph and UI buttons!
+    ATON.createSceneNode("classroom").load("samples/models/skyphos/basic_classroom.glb").attachToRoot();
+    
+    ATON.createSceneNode("newton_3rd_law").load("samples/models/skyphos/Newton_craddle_onDesk.glb").attachToRoot();
 
-	// // Load sample 3D model
-	ATON.createSceneNode("sample").load("samples/models/skyphos/Block_model.glb").attachToRoot();
-    // If our app required ore or more flares (plugins), we can also wait for them to be ready for specific setups
+    ATON.createSceneNode("Block_model").load("samples/models/skyphos/Block_model.glb").attachToRoot();
+    
+    // Wait for plugins to be ready
     ATON.on("AllFlaresReady",()=>{
-		//Do stuff
-		console.log("All flares ready");
-	});
+        console.log("All flares ready");
+    });
 };
-
-/* If you plan to use an update routine (executed continuously), you can place its logic here.
-APP.update = ()=>{
-
-};
-*/
