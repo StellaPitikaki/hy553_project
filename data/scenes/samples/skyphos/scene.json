@@ -1,7 +1,7 @@
 {
   "visibility": 1,
   "title": "physics classroom",
-  "description": "physics classroom demo",
+  "description": "\"<p>physics classroom demo</p>\"",
   "environment": {
     "mainpano": {
       "url": "samples/pano/defsky-grass.jpg"
