@@ -17,6 +17,8 @@ APP.setup = () => {
     ATON.createSceneNode("newton_3rd_law").load("samples/models/skyphos/Newton_craddle_onDesk.glb").attachToRoot();
 
     ATON.createSceneNode("Block_model").load("samples/models/skyphos/Block_model.glb").attachToRoot();
+
+	ATON.createSceneNode("Board").load("samples/models/skyphos/Board.glb").attachToRoot();
     
     // Wait for plugins to be ready
     ATON.on("AllFlaresReady",()=>{

@@ -30,10 +30,15 @@
       "urls": ["samples/models/skyphos/Block_model.glb"],
       "position": [2, 0, 0]
       
+    },
+    "Board": {
+      "urls": ["samples/models/skyphos/Board.glb"],
+      "position": [2, 0, 0]
+      
     }
   },
     "edges": {
-      ".": ["newton_3rd_law","Block_model","classroom"]
+      ".": ["newton_3rd_law","Block_model","classroom","Board"]
     }
   },
   "viewpoints": {
