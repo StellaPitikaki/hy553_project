@@ -4,7 +4,8 @@
     UI routines
 
     Author: B. Fanini
-    Enhanced with Physics Loop Controllers
+    Enhanced with Single-Button Physics Loop Controllers 
+    and Local UV-Corrected Asynchronous PDF Text Projection Engines
 
 ===========================================================================*/
 import WYSIWYG from "./WYSIWYG.js";
@@ -15,6 +16,16 @@ let UI = {};
 UI.physicsState = {
     isPlaying: true,
     mixers: []
+};
+
+// Global State Tracking for Local PDF Input with Polling Loop Initialized
+UI.pdfState = {
+    pdfDoc: null,
+    currentPage: 1,
+    totalPages: 0,
+    canvas: document.createElement('canvas'), // Hidden background scratch canvas
+    texture: null,
+    retryCount: 0
 };
 
 // 2. THE PROTOTYPE INTERCEPTOR: Catches all mixers natively when they frame-tick
@@ -37,9 +48,247 @@ if (typeof THREE !== 'undefined' && THREE.AnimationMixer && THREE.AnimationMixer
     };
 }
 
+// DYNAMIC LIBRARY INJECTION: Auto-load Mozilla's PDF.js via public CDN
+if (typeof pdfjsLib === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
+    script.onload = () => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        console.log("[PDF Engine] Local processing framework loaded successfully.");
+    };
+    document.head.appendChild(script);
+}
+
+// SLICER ENGINE: Processes raw uploaded binary data into interactive slides
+UI.loadLocalPDFData = (arrayBuffer) => {
+    if (typeof pdfjsLib === 'undefined') {
+        console.error("[PDF Engine] Library not fully initialized yet. Wait a second and retry.");
+        return;
+    }
+    
+    pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        disableFontFace: true 
+    }).promise.then(pdf => {
+        UI.pdfState.pdfDoc = pdf;
+        UI.pdfState.totalPages = pdf.numPages;
+        UI.pdfState.currentPage = 1;
+        UI.pdfState.retryCount = 0; 
+        console.log(`[PDF Engine] Local file parsed successfully! Total text slides: ${pdf.numPages}`);
+        UI.renderPDFPage(1); // Auto-render slide 1 instantly on upload
+    }).catch(err => {
+        console.error("[PDF Engine] Error parsing PDF data stream: ", err);
+    });
+};
+
+// TEXT EXTRACTOR PRESENTATION PASS ENGINE: Assembles and transforms raw lines into visible assets
+UI.renderPDFPage = (pageNum) => {
+    if (!UI.pdfState.pdfDoc) return;
+    UI.pdfState.retryCount = 0; 
+    
+    UI.pdfState.pdfDoc.getPage(pageNum).then(page => {
+        page.getTextContent().then(textContent => {
+            const canvas = UI.pdfState.canvas;
+            
+            canvas.width = 2048;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let textItems = textContent.items;
+            if (!textItems || textItems.length === 0) {
+                ctx.fillStyle = '#ff4757';
+                ctx.font = 'bold 65px sans-serif';
+                ctx.fillText("[Image Element Slide - No Extractable String Found]", 150, 512);
+                UI.updateBoardMeshTexture();
+                return;
+            }
+
+            let baselineMap = {};
+            textItems.forEach(item => {
+                let yCoord = Math.round(item.transform[5] / 12) * 12; 
+                if (!baselineMap[yCoord]) baselineMap[yCoord] = [];
+                baselineMap[yCoord].push(item);
+            });
+
+            let uniqueBaselines = Object.keys(baselineMap).map(Number).sort((a, b) => b - a);
+            let cleanLines = [];
+
+            uniqueBaselines.forEach(y => {
+                let horizontalItems = baselineMap[y].sort((a, b) => a.transform[4] - b.transform[4]);
+                let fullLineSentence = horizontalItems.map(item => item.str).join(" ").replace(/\s+/g, ' ').trim();
+                if (fullLineSentence) cleanLines.push(fullLineSentence);
+            });
+
+            // Native right alignment anchors elements smoothly without colliding
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#0a2540'; 
+            ctx.font = 'bold 70px Arial, Helvetica, sans-serif';
+            ctx.fillText("PHYSICS CLASSROOM PRESENTATION", 80, 110);
+            
+            ctx.textAlign = 'right';
+            ctx.font = 'bold 55px Arial, Helvetica, sans-serif';
+            ctx.fillStyle = '#627d98'; 
+            ctx.fillText(`Slide Page: ${pageNum} / ${UI.pdfState.totalPages}`, 1968, 110);
+            
+            ctx.textAlign = 'left';
+
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(60, 160);
+            ctx.lineTo(1988, 160);
+            ctx.stroke();
+
+            let startX = 90;
+            let startY = 270;
+            let bodyLineHeight = 90; 
+            let canvasMaxWidth = 1860;
+
+            console.log(`[PDF Engine] Printing Pass for Slide ${pageNum}. Text rows discovered: ${cleanLines.length}`);
+
+            for (let i = 0; i < cleanLines.length; i++) {
+                let lineText = cleanLines[i];
+                
+                if (i === 0 && cleanLines.length > 1 && lineText.length < 65) {
+                    ctx.font = 'bold 78px Arial, Helvetica, sans-serif';
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillText(lineText, startX, startY);
+                    startY += 120;
+                    continue;
+                }
+
+                ctx.font = '65px Arial, Helvetica, sans-serif';
+                ctx.fillStyle = '#1e293b';
+
+                let words = lineText.split(' ');
+                let currentWrapLine = '';
+
+                for (let n = 0; n < words.length; n++) {
+                    let testLine = currentWrapLine + words[n] + ' ';
+                    let textMetrics = ctx.measureText(testLine);
+                    
+                    if (textMetrics.width > canvasMaxWidth && n > 0) {
+                        ctx.fillText(currentWrapLine, startX, startY);
+                        currentWrapLine = words[n] + ' ';
+                        startY += bodyLineHeight;
+                        if (startY > 960) break;
+                    } else {
+                        currentWrapLine = testLine;
+                    }
+                }
+
+                if (startY > 960) break; 
+
+                ctx.fillText(currentWrapLine, startX, startY);
+                startY += bodyLineHeight + 15; 
+            }
+
+            UI.updateBoardMeshTexture();
+        });
+    });
+};
+
+// Maps our dynamically sliced canvas image onto the whiteboard surface mesh inside Board.glb
+UI.updateBoardMeshTexture = () => {
+    let boardNode = typeof ATON !== 'undefined' ? ATON.getSceneNode("Board") : null;
+    
+    let mainObj = null;
+    if (boardNode) {
+        if (boardNode.object3D) mainObj = boardNode.object3D;
+        else if (boardNode.group) mainObj = boardNode.group;
+        else if (boardNode.root) mainObj = boardNode.root;
+        else {
+            for (let key in boardNode) {
+                if (boardNode[key] && boardNode[key].isObject3D) {
+                    mainObj = boardNode[key];
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!boardNode || !mainObj) {
+        if (UI.pdfState.retryCount < 30) { 
+            UI.pdfState.retryCount++;
+            console.log(`[PDF Engine] Board 3D mesh is loading. Auto-retrying loop (Attempt ${UI.pdfState.retryCount}/30)...`);
+            setTimeout(UI.updateBoardMeshTexture, 300); 
+        } else {
+            console.warn("[PDF Engine] Polling stopped. Could not discover 'Board' scene node.");
+        }
+        return;
+    }
+
+    let targetMeshFound = false;
+    let discoveredNames = [];
+
+    mainObj.traverse(child => {
+        if (child.isMesh) {
+            discoveredNames.push(child.name);
+
+            if (child.name === "white_board" || child.name.toLowerCase().includes("board")) {
+                targetMeshFound = true;
+
+                if (child.geometry && child.geometry.attributes.position) {
+                    child.geometry.computeBoundingBox();
+                    let bbox = child.geometry.boundingBox;
+                    
+                    let posAttr = child.geometry.attributes.position;
+                    let count = posAttr.count;
+                    let calculatedUVs = new Float32Array(count * 2);
+
+                    for (let i = 0; i < count; i++) {
+                        let y = posAttr.getY(i);
+                        let z = posAttr.getZ(i);
+
+                        // Horizontal layout re-mapping equation matches left-to-right progression perfectly
+                        let u = 1.0 - ((z - bbox.min.z) / (bbox.max.z - bbox.min.z));
+                        let v = (bbox.max.y - y) / (bbox.max.y - bbox.min.y);
+
+                        calculatedUVs[i * 2] = u;
+                        calculatedUVs[i * 2 + 1] = v;
+                    }
+
+                    child.geometry.setAttribute('uv', new THREE.BufferAttribute(calculatedUVs, 2));
+                    child.geometry.attributes.uv.needsUpdate = true;
+                }
+
+                let freshTexture = new THREE.CanvasTexture(UI.pdfState.canvas);
+                freshTexture.flipY = false; 
+                
+                freshTexture.wrapS = THREE.ClampToEdgeWrapping;
+                freshTexture.wrapT = THREE.ClampToEdgeWrapping;
+                
+                freshTexture.minFilter = THREE.LinearFilter;
+                freshTexture.generateMipmaps = false;
+                
+                if (THREE.SRGBColorSpace) freshTexture.colorSpace = THREE.SRGBColorSpace;
+                
+                if (UI.pdfState.texture) {
+                    UI.pdfState.texture.dispose(); 
+                }
+                UI.pdfState.texture = freshTexture;
+
+                child.material = new THREE.MeshBasicMaterial({
+                    map: freshTexture,
+                    side: THREE.DoubleSide
+                });
+                child.material.needsUpdate = true;
+
+                console.log(`[PDF Engine] Successfully text-projected slide page ${UI.pdfState.currentPage} onto mesh node: ${child.name}`);
+            }
+        }
+    });
+
+    if (!targetMeshFound) {
+        console.warn("[PDF Engine] Failed to identify whiteboard mesh. Available components found inside model:", discoveredNames);
+    }
+};
+
 UI.WYSIWYG = WYSIWYG;
 UI.TASK_SYMBOL = "&rarr;";
-
 
 UI.setup = ()=>{
 
@@ -56,7 +305,7 @@ UI.setup = ()=>{
     ATON.UI.hideElement(UI._elMyGall);
 
     // UI elements to hide on interaction
-    ATON.on("NavInteraction", b =>{
+    ATON.on("NavInteraction", b => {
         if (HATHOR.currTask) return;
 
         if (b){
@@ -67,7 +316,28 @@ UI.setup = ()=>{
         }
     });
     
-    // (Note: Old nodeAdded and addUpdateRoutine blocks are completely removed from here!)
+    if (typeof ATON !== 'undefined') {
+        ATON.on("nodeAdded", (event) => {
+            let node = event.node;
+            if (node) {
+                let nid = node.nid;
+                
+                let nodeObj = node.object3D || node.group || node.root;
+                if (nodeObj && typeof nodeObj.traverse === 'function') {
+                    nodeObj.traverse(child => {
+                        child.__atonNodeId = nid;
+                    });
+                }
+
+                if (nid === "Board") {
+                    console.log("[PDF Engine] Board asset detected in scene graph. Applying active PDF texture...");
+                    setTimeout(() => { 
+                        UI.updateBoardMeshTexture(); 
+                    }, 250); 
+                }
+            }
+        });
+    }
 };
 
 /*
@@ -466,17 +736,17 @@ UI.buildCustomInterface = (elements)=>{
 
     for (let e in elements){
         const E = elements[e];
-        if (E==="nav")    UI._elMainToolbar.append(UI.createNavButton());
-        if (E==="layers") UI._elMainToolbar.append(UI.createLayersButton());
-        if (E==="cc")     UI._elMainToolbar.append(UI.createCopyrightsButton());
-        if (E==="fx")     UI._elMainToolbar.append(UI.createFXButton());
-        if (E==="tools")  UI._elMainToolbar.append(UI.createToolsButton());
-        if (E==="xr")     UI._elMainToolbar.append(UI.createXRButton());
-        if (E==="ar")     UI._elMainToolbar.append(ATON.UI.createButtonAR());
-        if (E==="vr")     UI._elMainToolbar.append(ATON.UI.createButtonVR());
-        if (E==="share")  UI._elMainToolbar.append(UI.createButtonShare());
-        if (E==="fs")     UI._elMainToolbar.append(ATON.UI.createButtonFullscreen());
-        if (E==="scene" || E==="info") UI._elMainToolbar.append(UI.createSceneButton());
+        if (E === "nav")    UI._elMainToolbar.append(UI.createNavButton());
+        if (E === "layers") UI._elMainToolbar.append(UI.createLayersButton());
+        if (E === "cc")     UI._elMainToolbar.append(UI.createCopyrightsButton());
+        if (E === "fx")     UI._elMainToolbar.append(UI.createFXButton());
+        if (E === "tools")  UI._elMainToolbar.append(UI.createToolsButton());
+        if (E === "xr")     UI._elMainToolbar.append(UI.createXRButton());
+        if (E === "ar")     UI._elMainToolbar.append(ATON.UI.createButtonAR());
+        if (E === "vr")     UI._elMainToolbar.append(ATON.UI.createButtonVR());
+        if (E === "share")  UI._elMainToolbar.append(UI.createButtonShare());
+        if (E === "fs")     UI._elMainToolbar.append(ATON.UI.createButtonFullscreen());
+        if (E === "scene" || E === "info") UI._elMainToolbar.append(UI.createSceneButton());
     }
     UI.postToolbar();
 };
@@ -532,7 +802,7 @@ UI.createBlockGroup = (options)=>{
 };
 
 /*
-    Semantics
+    Semantics Workspace Nodes
 =====================================*/
 UI.showSemanticPanel = (semid)=>{
     UI.closeToolPanel();
@@ -715,7 +985,7 @@ UI.sideSemantics = ()=>{
             }
 
             actions.push(
-                ATON.UI.createButtonSwitch({
+                ATON.UI.createButton({
                     icon: "visibility",
                     status: S.visible,
                     onswitch: (b)=>{
@@ -839,7 +1109,7 @@ UI.modalXR = ()=>{
 };
 
 /*
-    Side Panels (tools)
+    Side Accordion Tools Drawer Setup
 =====================================*/
 UI.openToolPanel = (options)=>{
     if (!options) options = {};
@@ -1355,7 +1625,7 @@ UI.sideNav = ()=>{
         if (numpovs>0) elPOVlist.prepend( UI.createTextBlock("List of viewpoints") );
         UI.updatePOVs();
 
-        if (numpovs < 1){ ATON.UI.hideElement(elPOVlist); ATON.UI.hideElement(UI._elPOVprev); ATON.UI.hideElement(UI._elPOVnext); }
+        if (numpovs < 1) { ATON.UI.hideElement(elPOVlist); ATON.UI.hideElement(UI._elPOVprev); ATON.UI.hideElement(UI._elPOVnext); }
         else { ATON.UI.showElement(elPOVlist); ATON.UI.showElement(UI._elPOVprev); ATON.UI.showElement(UI._elPOVnext); }
     };
 
@@ -1468,12 +1738,12 @@ UI.modalCopyrights = ()=>{
 };
 
 //====================================
-// Tools
+// Tools Drawer Rewrite Section
 //====================================
 UI.sideTools = ()=>{
     let elBody = ATON.UI.createContainer();
 
-    // --- 1. Existing Measurement Section ---
+    // --- 1. Measurement System ---
     let elMeasSection = ATON.UI.createContainer();
     elMeasSection.append(
         UI.createTextBlock("Add series of point-to-point measurements (AB)"),
@@ -1491,22 +1761,15 @@ UI.sideTools = ()=>{
         }),
         UI.createBlockGroup({
             items:[
-                ATON.UI.createButton({
-                    text: "Clear all measurements",
-                    icon: "delete",
-                    classes: "btn-default",
-                    onpress: ()=>{ HATHOR.ED.removeMeasures(); }
-                })
+                ATON.UI.createButton({ text: "Clear all measurements", icon: "delete", classes: "btn-default", onpress: ()=>{ HATHOR.ED.removeMeasures(); } })
             ]
         })
     );
 
-    // --- 2. NEW: Physics Loop Controls Section ---
-    
-   // Inside UI.sideTools -> Update your physics toggleBtn block to this:
+    // --- 2. Single Button Physics Controls Section (REVERTED BACK) ---
     let elPhysicsSection = ATON.UI.createContainer();
     
-    let toggleBtn = ATON.UI.createButton({
+    let togglePhysicsBtn = ATON.UI.createButton({
         text: UI.physicsState.isPlaying ? "Pause Simulation" : "Resume Simulation",
         icon: UI.physicsState.isPlaying ? "bi-pause-fill" : "bi-play-fill",
         classes: "hathor-btn-task", 
@@ -1524,38 +1787,79 @@ UI.sideTools = ()=>{
 
             // Update button visual text components
             if (UI.physicsState.isPlaying) {
-                toggleBtn.querySelector(".aton-btn-text").innerText = "Pause Simulation";
+                togglePhysicsBtn.querySelector(".aton-btn-text").innerText = "Pause Simulation";
             } else {
-                toggleBtn.querySelector(".aton-btn-text").innerText = "Resume Simulation";
+                togglePhysicsBtn.querySelector(".aton-btn-text").innerText = "Resume Simulation";
             }
         }
     });
 
     elPhysicsSection.append(
-        UI.createTextBlock("Control the interactive timeline playback loops of 3D objects in the current physics workspace:"),
-        UI.createBlockGroup({ items: [toggleBtn] })
+        UI.createTextBlock("Control physics animations within the global scene loop:"),
+        UI.createBlockGroup({ items: [togglePhysicsBtn] })
     );
 
+    // --- 3. Local HTML5 PDF Projector Input Section ---
+    let elBoardSection = ATON.UI.createContainer();
+    
+    let htmlUploader = document.createElement('input');
+    htmlUploader.type = 'file';
+    htmlUploader.accept = 'application/pdf';
+    htmlUploader.className = 'form-control aton-input-text';
+    htmlUploader.style.marginBottom = '12px';
 
-    // --- 3. Build Collapsible Side Tree Layout ---
+    htmlUploader.onchange = (e) => {
+        let file = e.target.files[0];
+        if (!file) return;
+
+        let reader = new FileReader();
+        reader.onload = (event) => {
+            UI.loadLocalPDFData(event.target.result);
+        };
+        reader.readAsArrayBuffer(file);
+    };
+    
+    let btnPrev = ATON.UI.createButton({
+        text: "Previous Slide",
+        classes: "btn-default",
+        onpress: () => {
+            if (UI.pdfState.currentPage > 1) {
+                UI.pdfState.currentPage--;
+                UI.renderPDFPage(UI.pdfState.currentPage);
+            }
+        }
+    });
+
+    let btnNext = ATON.UI.createButton({
+        text: "Next Slide",
+        classes: "hathor-btn-task", 
+        onpress: () => {
+            if (UI.pdfState.currentPage < UI.pdfState.totalPages) {
+                UI.pdfState.currentPage++;
+                UI.renderPDFPage(UI.pdfState.currentPage);
+            }
+        }
+    });
+
+    elBoardSection.append(
+        UI.createTextBlock("Select a local PDF file to slide-project onto the board:"),
+        htmlUploader,
+        UI.createBlockGroup({ items: [btnPrev, btnNext] })
+    );
+
+    // --- 4. Package Elements inside Collapsible Tree Accordions ---
     elBody.append(
         ATON.UI.createTreeGroup({
             items:[
-                {
-                    title: "Measure Tools",
-                    open: true,
-                    content: elMeasSection
-                },
-                {
-                    title: "Physics Mechanics",
-                    open: true,
-                    content: elPhysicsSection
-                }
+                { title: "Measure Tools", open: false, content: elMeasSection },
+                { title: "Physics Mechanics", open: false, content: elPhysicsSection },
+                { title: "Presentation Board", open: true, content: elBoardSection }
             ]
         })
     );
 
     UI.highlightTBPanel(UI._elTools);
+    
     UI.openToolPanel({
         header: "Tools Menu Container",
         body: elBody
@@ -1624,28 +1928,30 @@ UI.createTaskDescr = (text)=> ATON.UI.elem("<div class='hathor-task-descr'>"+tex
 
 UI.buildTaskToolbar = (task)=>{
     if (!task) return;
-    UI._elTasks.innerHTML = ""; UI._elTaskDescr.innerHTML = "";
+    UI._elTasks.innerHTML = ""; UI._elTasks.innerHTML = "";
     UI.hideMainElements();
-    ATON.UI.showElement(UI._elTasks); ATON.UI.showElement(UI._elTaskDescr);
+    ATON.UI.showElement(UI._elTasks); ATON.UI.showElement(UI._elTasks);
 
     if (task === HATHOR.TASK_BASIC_ANN){
         let selRange = ATON.SUI.getSelectorRange();
-        UI._elTaskDescr.innerHTML = "Click surface location to add an annotation sphere.";
-        HATHOR.UI._elTasks.append(
+        UI._elTasks.innerHTML = "Click surface location to add an annotation sphere.";
+        UI._elTasks.append(
             ATON.UI.createButton({ text: "Cancel", icon: "bi-x-lg", classes: "btn-default", onpress: ()=>{ HATHOR.endCurrentTask(); UI.sideSemantics(); } }),
             ATON.UI.createContainer({ style: "display:inline-block;", items:[ ATON.UI.createSlider({ range: selRange, step: (selRange[1]-selRange[0]) * 0.01, value: ATON.SUI.getSelectorRadius(), oninput: (r)=>{ ATON.SUI.setSelectorRadius(r); } }) ] })
         );
     }
     if (task === HATHOR.TASK_MEASURE_AB){
-        UI._elTaskDescr.innerHTML = "Tap points to measure absolute linear distance segments.";
-        HATHOR.UI._elTasks.append( ATON.UI.createButton({ text: "Done", icon: "bi-check-lg", classes: "btn-accent", onpress: ()=>{ HATHOR.endCurrentTask(); UI.sideTools(); } }) ); 
+        UI._elTasks.innerHTML = "Tap points to measure absolute linear distance segments.";
+        UI._elTasks.append( ATON.UI.createButton({ text: "Done", icon: "bi-check-lg", classes: "btn-accent", onpress: ()=>{ HATHOR.endCurrentTask(); UI.sideTools(); } }) ); 
     }
 };
 
 UI.clearTaskToolbar = ()=>{
-    UI._elTasks.innerHTML = ""; UI._elTaskDescr.innerHTML = "";
-    ATON.UI.hideElement(UI._elTasks); ATON.UI.hideElement(UI._elTaskDescr);
+    UI._elTasks.innerHTML = ""; UI._elTasks.innerHTML = "";
+    ATON.UI.hideElement(UI._elTasks); ATON.UI.hideElement(UI._elTasks);
     UI.showMainElements();
 };
+
+if (typeof HATHOR !== 'undefined') HATHOR.UI = UI;
 
 export default UI;
